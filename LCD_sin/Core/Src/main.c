@@ -190,10 +190,12 @@ void SystemClock_Config(void)
 #define LCD_WIDTH 240
 #define LCD_HEIGHT 320
 
+#define LEFT_MARGIN 30
+
 static float TIME_WINDOW_S = 1.0f;        /* 时间窗口：显示1秒内的波形 */
-static float VOLTAGE_RANGE_V = 10.0f;     /* 电压范围：±5V，总共10V */
-static float WAVE_PERIOD_S = 0.125f;       /* 波形周期：0.25秒（4Hz） */
-static float WAVE_AMPLITUDE_V = 4.0f;     /* 波形幅度：4V */
+static float VOLTAGE_RANGE_V = 4.0f;     /* 电压范围：±5V，总共10V */
+static float WAVE_PERIOD_S = 0.5f;       /* 波形周期：0.25秒（4Hz） */
+static float WAVE_AMPLITUDE_V = 1.0f;     /* 波形幅度：4V */
 
 static const int TOP_MARGIN = 20;         /* 顶部边距，用于显示参数信息 */
 
@@ -212,7 +214,11 @@ static void draw_sine_wave_time(float time_offset, uint16_t color)
 {
   const float two_pi = 2.0f * 3.14159265359f;  /* 2π常数，用于正弦函数计算 */
 
-  /* 计算可绘制区域 */
+  /* 计算可绘制区域（为Y轴标签保留左侧边距） */
+  const int drawable_x0 = LEFT_MARGIN;          /* 可绘制区域起始X坐标 */
+  const int drawable_x1 = LCD_WIDTH - 1;       /* 可绘制区域结束X坐标 */
+  const int drawable_w = drawable_x1 - drawable_x0 + 1; /* 可绘制区域宽度 */
+
   const int drawable_y0 = TOP_MARGIN;           /* 可绘制区域起始Y坐标 */
   const int drawable_y1 = LCD_HEIGHT - 1;       /* 可绘制区域结束Y坐标 */
   const int drawable_h = drawable_y1 - drawable_y0 + 1;  /* 可绘制区域高度 */
@@ -227,15 +233,53 @@ static void draw_sine_wave_time(float time_offset, uint16_t color)
 
   /* 绘制中心参考线（接地线） */
   int16_t y_center = drawable_y0 + drawable_h / 2;  /* 计算屏幕中心Y坐标 */
-  lcd_draw_line(0, y_center, LCD_WIDTH - 1, y_center, BLACK);  /* 绘制黑色水平线 */
+  /* 绘制坐标轴：Y轴放在drawable_x0，X轴放在y_center */
+  lcd_draw_line(drawable_x0, drawable_y0, drawable_x0, drawable_y1, BLACK); /* Y轴 */
+  lcd_draw_line(drawable_x0, y_center, drawable_x1, y_center, BLACK);  /* X轴 */
 
-  /* 逐点计算并用线段连接相邻点以获得更平滑的波形 */
+  /* 在坐标轴上绘制刻度和参数标签 */
+  const int x_ticks = 5; /* X轴刻度数（含两端） */
+  for (int i = 0; i < x_ticks; i++) {
+    float frac = (float)i / (float)(x_ticks - 1);
+    int tx = drawable_x0 + (int)(frac * (drawable_w - 1));
+    int ty0 = y_center - 4;
+    int ty1 = y_center + 4;
+    lcd_draw_line(tx, ty0, tx, ty1, BLACK); /* 刻度 */
+
+    /* 计算对应的时间标签（相对于当前time_offset的时间） */
+    float t_label = time_offset - TIME_WINDOW_S * (1.0f - frac);
+    char lbl[16];
+    snprintf(lbl, sizeof(lbl), "%.2fs", t_label);
+    /* 标签绘制在刻度下方 */
+    lcd_show_string(tx - 20, ty1 + 2, 40, 12, 12, lbl, BLACK);
+  }
+
+  const int y_ticks = 5; /* Y轴刻度数 */
+  for (int i = 0; i < y_ticks; i++) {
+    float frac = (float)i / (float)(y_ticks - 1); /* 0..1 对应从上到下 */
+    int ty = drawable_y0 + (int)(frac * (drawable_h - 1));
+    int tx0 = drawable_x0 - 4;
+    int tx1 = drawable_x0 + 4;
+    lcd_draw_line(tx0, ty, tx1, ty, BLACK); /* 刻度 */
+
+    /* 电压标签：上为+V/2，下为-V/2 */
+    float v_label = (1.0f - frac) * (VOLTAGE_RANGE_V / 2.0f) - (-(VOLTAGE_RANGE_V / 2.0f));
+    /* 上式有点绕，直接从+V/2到-V/2 */
+    v_label = (1.0f - frac) * (VOLTAGE_RANGE_V / 2.0f) - frac * (VOLTAGE_RANGE_V / 2.0f);
+    char vstr[16];
+    snprintf(vstr, sizeof(vstr), "%.2fV", v_label);
+    /* 标签绘制在Y轴左侧 */
+    lcd_show_string(2, ty - 6, LEFT_MARGIN - 4, 12, 12, vstr, BLACK);
+  }
+
+  /* 逐点计算并用线段连接相邻点以获得更平滑的波形（在drawable_x0..drawable_x1范围内） */
   int prev_x = 0;
   int16_t prev_y = 0;
   int has_prev = 0;
-  for (int x = 0; x < LCD_WIDTH; x++) {
-    /* 计算当前像素点对应的时间坐标 */
-    float t = time_offset - TIME_WINDOW_S * (1.0f - ((float)x / (float)(LCD_WIDTH - 1)));
+  for (int i = 0; i < drawable_w; i++) {
+    int x = drawable_x0 + i;
+    /* 计算当前像素点对应的时间坐标（从左到右为过去->现在） */
+    float t = time_offset - TIME_WINDOW_S * (1.0f - ((float)i / (float)(drawable_w - 1)));
 
     /* 计算正弦波电压值 */
     float value_v = WAVE_AMPLITUDE_V * sinf(two_pi * t / WAVE_PERIOD_S);
