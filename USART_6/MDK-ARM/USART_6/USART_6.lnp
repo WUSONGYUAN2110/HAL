@@ -1,0 +1,27 @@
+--cpu=Cortex-M4.fp.sp
+"usart_6\startup_stm32f407xx.o"
+"usart_6\main.o"
+"usart_6\gpio.o"
+"usart_6\dma.o"
+"usart_6\usart.o"
+"usart_6\stm32f4xx_it.o"
+"usart_6\stm32f4xx_hal_msp.o"
+"usart_6\stm32f4xx_hal_uart.o"
+"usart_6\stm32f4xx_hal_rcc.o"
+"usart_6\stm32f4xx_hal_rcc_ex.o"
+"usart_6\stm32f4xx_hal_flash.o"
+"usart_6\stm32f4xx_hal_flash_ex.o"
+"usart_6\stm32f4xx_hal_flash_ramfunc.o"
+"usart_6\stm32f4xx_hal_gpio.o"
+"usart_6\stm32f4xx_hal_dma_ex.o"
+"usart_6\stm32f4xx_hal_dma.o"
+"usart_6\stm32f4xx_hal_pwr.o"
+"usart_6\stm32f4xx_hal_pwr_ex.o"
+"usart_6\stm32f4xx_hal_cortex.o"
+"usart_6\stm32f4xx_hal.o"
+"usart_6\stm32f4xx_hal_exti.o"
+"usart_6\system_stm32f4xx.o"
+--library_type=microlib --strict --scatter "USART_6\USART_6.sct"
+--summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
+--info sizes --info totals --info unused --info veneers
+--list "USART_6.map" -o USART_6\USART_6.axf
