@@ -185,19 +185,20 @@ void SystemClock_Config(void)
  * VOLTAGE_RANGE_V: 电压显示范围（伏特）
  * WAVE_PERIOD_S: 正弦波周期（秒）
  * WAVE_AMPLITUDE_V: 正弦波幅度（伏特）
- * TOP_MARGIN: 顶部边距，用于显示信息文字
  */
 #define LCD_WIDTH 240
 #define LCD_HEIGHT 320
 
-#define LEFT_MARGIN 30
+#define LEFT_MARGIN 50                     /* 左侧边距，用于Y轴标签显示 */
+#define LABEL_MARGIN 5                     /* 标签距离屏幕左边的边距 */
 
 static float TIME_WINDOW_S = 1.0f;        /* 时间窗口：显示1秒内的波形 */
-static float VOLTAGE_RANGE_V = 4.0f;     /* 电压范围：±5V，总共10V */
-static float WAVE_PERIOD_S = 0.5f;       /* 波形周期：0.25秒（4Hz） */
-static float WAVE_AMPLITUDE_V = 1.0f;     /* 波形幅度：4V */
+static float VOLTAGE_RANGE_V = 4.0f;      /* 电压范围：±2V */
+static float WAVE_PERIOD_S = 0.5f;        /* 波形周期：0.5秒（2Hz） */
+static float WAVE_AMPLITUDE_V = 1.0f;     /* 波形幅度：1V */
 
-static const int TOP_MARGIN = 20;         /* 顶部边距，用于显示参数信息 */
+static const int TOP_MARGIN = 15;         /* 顶部边距，避免Y轴紧贴屏幕顶部 */
+static const int BOTTOM_MARGIN = 15;      /* 底部边距，避免X轴标签被截断 */
 
 /**
  * @brief 绘制正弦波函数
@@ -205,7 +206,7 @@ static const int TOP_MARGIN = 20;         /* 顶部边距，用于显示参数信息 */
  * @param color 波形颜色（16位RGB颜色）
  * 
  * 功能：
- * 1. 清屏并显示当前参数信息
+ * 1. 清除波形区域并显示当前参数信息
  * 2. 绘制中心参考线
  * 3. 根据时间偏移量绘制动态正弦波
  * 4. 支持电压值到屏幕坐标的转换
@@ -220,16 +221,11 @@ static void draw_sine_wave_time(float time_offset, uint16_t color)
   const int drawable_w = drawable_x1 - drawable_x0 + 1; /* 可绘制区域宽度 */
 
   const int drawable_y0 = TOP_MARGIN;           /* 可绘制区域起始Y坐标 */
-  const int drawable_y1 = LCD_HEIGHT - 1;       /* 可绘制区域结束Y坐标 */
+  const int drawable_y1 = LCD_HEIGHT - 1 - BOTTOM_MARGIN;  /* 可绘制区域结束Y坐标 */
   const int drawable_h = drawable_y1 - drawable_y0 + 1;  /* 可绘制区域高度 */
 
-  lcd_clear(WHITE);  /* 清屏为白色背景 */
-
-  /* 显示当前波形参数信息 */
-  char buf[64];
-  snprintf(buf, sizeof(buf), "Twin=%.2fs P=%.3fs A=%.2fV", 
-           TIME_WINDOW_S, WAVE_PERIOD_S, WAVE_AMPLITUDE_V);
-  lcd_show_string(0, 0, 200, 16, 16, buf, BLUE);
+  /* 只清除波形绘制区域（不包括Y轴标签区域），避免全屏闪烁 */
+  lcd_fill(drawable_x0, drawable_y0, drawable_x1, drawable_y1, WHITE);
 
   /* 绘制中心参考线（接地线） */
   int16_t y_center = drawable_y0 + drawable_h / 2;  /* 计算屏幕中心Y坐标 */
@@ -263,13 +259,11 @@ static void draw_sine_wave_time(float time_offset, uint16_t color)
     lcd_draw_line(tx0, ty, tx1, ty, BLACK); /* 刻度 */
 
     /* 电压标签：上为+V/2，下为-V/2 */
-    float v_label = (1.0f - frac) * (VOLTAGE_RANGE_V / 2.0f) - (-(VOLTAGE_RANGE_V / 2.0f));
-    /* 上式有点绕，直接从+V/2到-V/2 */
-    v_label = (1.0f - frac) * (VOLTAGE_RANGE_V / 2.0f) - frac * (VOLTAGE_RANGE_V / 2.0f);
+    float v_label = (1.0f - frac) * (VOLTAGE_RANGE_V / 2.0f) - frac * (VOLTAGE_RANGE_V / 2.0f);
     char vstr[16];
-    snprintf(vstr, sizeof(vstr), "%.2fV", v_label);
-    /* 标签绘制在Y轴左侧 */
-    lcd_show_string(2, ty - 6, LEFT_MARGIN - 4, 12, 12, vstr, BLACK);
+    snprintf(vstr, sizeof(vstr), "%.1fV", v_label);  /* 缩短为1位小数 */
+    /* 标签绘制在Y轴左侧，距离屏幕左边有边距 */
+    lcd_show_string(LABEL_MARGIN, ty - 6, 40, 12, 12, vstr, BLACK);
   }
 
   /* 逐点计算并用线段连接相邻点以获得更平滑的波形（在drawable_x0..drawable_x1范围内） */
